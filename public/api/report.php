@@ -71,7 +71,7 @@ try {
         'url' => $url,
         'score' => $report['score'] ?? 0,
         'file' => basename($file),
-        'download' => '/download.php?file=' . urlencode(basename($file)),
+        'download' => '/api/download.php?file=' . urlencode(basename($file)),
     ]);
 } catch (Exception $e) {
     http_response_code(500);

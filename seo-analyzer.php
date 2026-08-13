@@ -341,14 +341,27 @@ class CLI
         $report = $analyzer->analyze();
         $this->db()->save($url, $report);
 
+        // Directorio por defecto: data/reports (igual que la web). --out puede
+        // ser relativo o absoluto; si es relativo se resuelve contra el cwd.
+        $outDir = __DIR__ . '/data/reports';
+        if (!is_dir($outDir)) {
+            mkdir($outDir, 0775, true);
+        }
+
         if (!empty($opts['pdf'])) {
-            $out = $opts['out'] ?? 'reporte-' . date('Ymd-His') . '.pdf';
+            $out = $opts['out'] ?? $outDir . '/reporte-' . date('Ymd-His') . '.pdf';
+            if (isset($opts['out']) && !$this->isAbsolute($out)) {
+                $out = getcwd() . DIRECTORY_SEPARATOR . $out;
+            }
             $pdf = new ReportPDF('portrait');
             $pdf->buildReport($report);
             $pdf->output($out);
             $this->out("PDF generado: {$out}", 'green');
         } elseif (!empty($opts['html'])) {
-            $out = $opts['out'] ?? 'reporte-' . date('Ymd-His') . '.html';
+            $out = $opts['out'] ?? $outDir . '/reporte-' . date('Ymd-His') . '.html';
+            if (isset($opts['out']) && !$this->isAbsolute($out)) {
+                $out = getcwd() . DIRECTORY_SEPARATOR . $out;
+            }
             $html = new ReportHTML();
             file_put_contents($out, $html->buildReport($report));
             $this->out("HTML generado: {$out}", 'green');
@@ -356,6 +369,12 @@ class CLI
             $this->printReport($report);
         }
         return 0;
+    }
+
+    private function isAbsolute(string $path): bool
+    {
+        return str_starts_with($path, '/') || str_starts_with($path, DIRECTORY_SEPARATOR)
+            || (bool)preg_match('/^[A-Za-z]:[\\\\\\/]/', $path);
     }
 
     private function history(array $args): int

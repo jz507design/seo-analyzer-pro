@@ -57,7 +57,7 @@ try {
             'success' => true,
             'format' => $format,
             'file' => basename($file),
-            'download' => '/download.php?file=' . urlencode(basename($file)),
+            'download' => '/api/download.php?file=' . urlencode(basename($file)),
             'winner_index' => $data['winner_index'],
         ]);
     } else {
