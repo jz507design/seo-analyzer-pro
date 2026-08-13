@@ -113,13 +113,17 @@ class CLI
 
     private function askApiKey(): string
     {
+        // Si no hay terminal interactiva (pipe/script), no bloquear: devolver vacio.
+        if (!stream_isatty(STDIN)) {
+            return '';
+        }
         if (function_exists('readline')) {
             $key = readline('DeepSeek API key (solo para esta sesion): ');
         } else {
             echo 'DeepSeek API key (solo para esta sesion): ';
-            $key = trim(fgets(STDIN) ?: '');
+            $key = fgets(STDIN) ?: '';
         }
-        return trim($key);
+        return trim((string)$key);
     }
 
     private function out(string $msg, string $color = 'white'): void
