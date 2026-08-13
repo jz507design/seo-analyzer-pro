@@ -1,0 +1,18 @@
+# Configuracion y secretos (nunca subir API keys)
+config/config.local.php
+*.key
+.env
+
+# Base de datos local y reportes generados
+data/*.sqlite
+data/*.sqlite-journal
+data/reports/
+*.pdf
+*.html.tmp
+
+# Cache de PHP
+.phpunit.cache/
+
+# Sistema
+Thumbs.db
+.DS_Store
