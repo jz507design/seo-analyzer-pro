@@ -1,26 +1,42 @@
 # SEO Analyzer Pro - Instalador PowerShell (estilo opencode)
 # Uso:
 #   irm https://raw.githubusercontent.com/jz507design/seo-analyzer-pro/main/install.ps1 | iex
-# Instala el CLI en $HOME\seo-analyzer y deja el comando `seo` disponible.
+# Instala el CLI y deja el comando `seo` disponible.
+# Opcional: $env:SEO_INSTALL_DIR apunta a otra ubicacion (default $HOME\seo-analyzer).
 
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $Repo = "jz507design/seo-analyzer-pro"
 $Branch = "main"
-$InstallDir = Join-Path $HOME "seo-analyzer"
-$GitHubRaw = "https://raw.githubusercontent.com/$Repo/$Branch"
+$InstallDir = if ($env:SEO_INSTALL_DIR) { $env:SEO_INSTALL_DIR } else { Join-Path $HOME "seo-analyzer" }
 
 function Write-Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "[OK] $msg" -ForegroundColor Green }
 function Write-Warn($msg) { Write-Host "[!] $msg" -ForegroundColor Yellow }
+
+function Invoke-Git {
+  param([string[]]$GitArgs)
+  # git escribe progreso a stderr; en PS 5.1 eso genera ErrorRecord y con
+  # ErrorActionPreference=Stop rompe el flujo. Forzamos Continue y usamos
+  # $LASTEXITCODE como fuente de verdad.
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $out = & git @GitArgs 2>&1
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $prev
+  if ($code -ne 0) {
+    throw "git fallo (codigo $code): $($out -join ' ')"
+  }
+  return $out
+}
 
 Write-Host ""
 Write-Host "  SEO Analyzer Pro - Instalador (JZ Design Solutions)" -ForegroundColor White
 Write-Host "  https://github.com/$Repo" -ForegroundColor DarkGray
 Write-Host ""
 
-# 1) Detectar git (para clonar)
+# 1) Detectar git
 $git = Get-Command git -ErrorAction SilentlyContinue
 if (-not $git) {
   Write-Warn "Git no detectado. Instalando git..."
@@ -74,10 +90,10 @@ Write-Ok "Extensiones OK (pdo_sqlite, mbstring, openssl, dom)"
 Write-Step "Descargando SEO Analyzer Pro a $InstallDir"
 if (Test-Path (Join-Path $InstallDir "seo-analyzer.php")) {
   Write-Ok "Ya existe. Actualizando con git pull..."
-  git -C $InstallDir pull --ff-only 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+  Invoke-Git @("-C", $InstallDir, "pull", "--ff-only") | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
 } else {
   New-Item -ItemType Directory -Force -Path (Split-Path $InstallDir) | Out-Null
-  git clone --depth 1 --branch $Branch "https://github.com/$Repo.git" $InstallDir 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+  Invoke-Git @("clone", "--depth", "1", "--branch", $Branch, "https://github.com/$Repo.git", $InstallDir) | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
 }
 
 # 5) Preparar data/ (sqlite + reportes)
@@ -87,8 +103,8 @@ Write-Ok "Carpeta de datos lista: $dataDir"
 
 # 6) Definir funcion 'seo' para la sesion actual
 function global:seo {
-  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
-  & $phpExe (Join-Path $HOME "seo-analyzer\seo-analyzer.php") @Args
+  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$A)
+  & $phpExe (Join-Path $InstallDir "seo-analyzer.php") @A
 }
 
 # 7) Persistir en el perfil de PowerShell
