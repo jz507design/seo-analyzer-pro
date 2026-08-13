@@ -116,7 +116,7 @@ $seoBlock = @"
 # SEO Analyzer Pro (instalado automaticamente)
 function global:seo {
   param([Parameter(ValueFromRemainingArguments = `$true)][string[]]`$a)
-  & "$phpExe" "$InstallDir\seo-analyzer.php" @`$a
+  & "$phpExe" "$InstallDir\seo-analyzer.php" @a
 }
 "@
 if (-not (Test-Path $profilePath)) { New-Item -ItemType File -Force -Path $profilePath | Out-Null }
