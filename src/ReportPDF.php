@@ -42,6 +42,17 @@ class ReportPDF
 
     /* ================= bajo nivel ================= */
 
+    /**
+     * Convierte una Y del sistema "arriba-izquierda" (como se usa en el resto
+     * de la clase) a la coordenada PDF estandar (origen abajo-izquierda).
+     * Antes se usaba una CTM con reflexion (1 0 0 -1 0 H cm) que volteaba
+     * el texto y dejaba bandas en posiciones invertidas.
+     */
+    private function py(float $y): float
+    {
+        return $this->pageHeight - $y;
+    }
+
     private function emit(string $s): void
     {
         $this->pages[$this->pageCount - 1] .= $s;
@@ -49,7 +60,9 @@ class ReportPDF
 
     private function rgb(array $c): string
     {
-        return sprintf('%.3f %.3f %.3f rg', $c[0] / 255, $c[1] / 255, $c[2] / 255);
+        // Espacio final obligatorio: sin el, "rg" se concatena con el siguiente
+        // operador (ej. "rg0.00 750.00") y el parser PDF rompe el stream.
+        return sprintf('%.3f %.3f %.3f rg ', $c[0] / 255, $c[1] / 255, $c[2] / 255);
     }
 
     private function sanitize(string $s): string
@@ -72,8 +85,9 @@ class ReportPDF
 
     public function addPage(): void
     {
-        // CTM: invierte Y para que 0,0 quede arriba-izquierda
-        $this->pages[] = sprintf("1 0 0 -1 0 %.2f cm\n", $this->pageHeight);
+        // Coordenadas PDF estandar: origen abajo-izquierda. La conversion de
+        // Y se hace en cada primitiva via py() (evita CTM reflectante).
+        $this->pages[] = '';
         $this->pageCount = count($this->pages);
         $this->y = $this->margin;
     }
@@ -98,14 +112,16 @@ class ReportPDF
     public function rect(float $x, float $y, float $w, float $h, array $rgb): void
     {
         $this->emit($this->rgb($rgb));
-        $this->emit(sprintf("%.2f %.2f %.2f %.2f re f\n", $x, $y, $w, $h));
+        // En PDF "re" usa la esquina inferior-izquierda: la Y del sistema
+        // arriba-izquierda es la esquina superior -> convertir con py() - h.
+        $this->emit(sprintf("%.2f %.2f %.2f %.2f re f\n", $x, $this->py($y + $h), $w, $h));
     }
 
     public function line(float $x1, float $y1, float $x2, float $y2, array $rgb, float $width = 1): void
     {
         $this->emit($this->rgb($rgb));
         $this->emit(sprintf("%.2f w\n", $width));
-        $this->emit(sprintf("%.2f %.2f m %.2f %.2f l S\n", $x1, $y1, $x2, $y2));
+        $this->emit(sprintf("%.2f %.2f m %.2f %.2f l S\n", $x1, $this->py($y1), $x2, $this->py($y2)));
     }
 
     public function text(float $x, float $y, string $str, int $size = 10, ?array $rgb = null, string $family = 'helvetica'): void
@@ -117,8 +133,18 @@ class ReportPDF
         }
         $this->emit("BT\n/F{$this->fontUsed[$key]} {$size} Tf\n");
         $this->emit($this->rgb($rgb));
-        $this->emit(sprintf("%.2f %.2f Td\n", $x, $y));
+        // En PDF "Td" posiciona la linea base del texto; el texto crece hacia
+        // arriba, por eso convertimos la Y superior al espacio PDF.
+        $this->emit(sprintf("%.2f %.2f Td\n", $x, $this->py($y + $size)));
         $this->emit('(' . $this->esc($str) . ") Tj\nET\n");
+    }
+
+    public function textRight(float $xRight, float $y, string $str, int $size = 10, ?array $rgb = null, string $family = 'helvetica'): void
+    {
+        // Alinea el FINAL del texto contra xRight (el texto crece hacia la
+        // izquierda); sin esto los textos del margen derecho se salian del
+        // canvas y quedaban cortados ("https://ex").
+        $this->text($xRight - $this->textWidth($str, $size), $y, $str, $size, $rgb, $family);
     }
 
     public function textWidth(string $str, int $size): float
@@ -164,8 +190,8 @@ class ReportPDF
         $this->text($this->margin, 30, 'JZ DESIGN SOLUTIONS', 14, $this->brand['white']);
         $this->text($this->margin, 56, 'SEO ANALYZER PRO', 22, $this->brand['white']);
         $this->text($this->margin, 80, $subtitle, 9, [215, 235, 236]);
-        $this->text($this->pageWidth - $this->margin, 34, $url, 10, $this->brand['white']);
-        $this->text($this->pageWidth - $this->margin, 54, $date, 9, [215, 235, 236]);
+        $this->textRight($this->pageWidth - $this->margin, 34, $url, 10, $this->brand['white']);
+        $this->textRight($this->pageWidth - $this->margin, 54, $date, 9, [215, 235, 236]);
         $this->y = $bandH + 16;
     }
 
@@ -192,7 +218,7 @@ class ReportPDF
         $this->rect($this->margin, $this->y, 10, 10, $color);
         $this->text($this->margin + 18, $this->y + 1, $label, 10, $this->brand['dark']);
         if ($detail !== '') {
-            $this->text($this->pageWidth - $this->margin, $this->y + 1, $detail, 9, $this->brand['muted']);
+            $this->textRight($this->pageWidth - $this->margin, $this->y + 1, $detail, 9, $this->brand['muted']);
         }
         $this->y += 16;
     }
@@ -204,7 +230,7 @@ class ReportPDF
         $color = $pct > 80 ? $this->brand['red'] : ($pct > 50 ? $this->brand['amber'] : $this->brand['green']);
         $this->text($this->margin, $this->y, $label, 10, $this->brand['dark']);
         $formatted = $val == floor($val) ? (string)(int)$val : number_format($val, 1);
-        $this->text($this->pageWidth - $this->margin, $this->y, $formatted . ' ' . $unit, 9, $this->brand['muted']);
+        $this->textRight($this->pageWidth - $this->margin, $this->y, $formatted . ' ' . $unit, 9, $this->brand['muted']);
         $this->y += 14;
         $this->progressBar($this->margin, $this->y, $this->pageWidth - $this->margin * 2, $pct, $color);
         $this->y += 12;
@@ -235,7 +261,7 @@ class ReportPDF
         $this->rect(0, $this->pageHeight - $h, $this->pageWidth, $h, $this->brand['dark']);
         $this->text($this->margin, $this->pageHeight - 34, 'JZ DESIGN SOLUTIONS', 13, $this->brand['white']);
         $this->text($this->margin, $this->pageHeight - 50, 'https://jzds.me  |  contact@jzds.me  |  +507 6070-0978', 9, [200, 210, 215]);
-        $this->text($this->pageWidth - $this->margin, $this->pageHeight - 50, 'Generado por SEO Analyzer Pro', 9, [200, 210, 215]);
+        $this->textRight($this->pageWidth - $this->margin, $this->pageHeight - 50, 'Generado por SEO Analyzer Pro', 9, [200, 210, 215]);
     }
     /* ================= informe de auditoria ================= */
 
