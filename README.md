@@ -9,11 +9,14 @@ Herramienta de auditoria SEO tecnica completa, desarrollada por **JZ Design Solu
 
 ## Instalacion
 
-### Windows
-```cmd
-install.bat
+### Windows (un comando, estilo opencode)
+```powershell
+irm https://cdn.jsdelivr.net/gh/jz507design/seo-analyzer-pro@main/install.ps1 | iex
 ```
-Si no tienes PHP: descargalo de https://windows.php.net/download/ y agregalo al PATH (o usa XAMPP y agrega `C:\xampp\php`).
+El instalador detecta/instala Git y PHP (winget), clona el repo a `$HOME\seo-analyzer`,
+crea la carpeta de datos y deja el comando `seo` disponible en PowerShell (persistente).
+
+Tambien puedes usar `install.bat` del repo.
 
 ### Linux / MacOS
 ```bash
@@ -23,7 +26,8 @@ El instalador detecta e instala PHP automaticamente (apt/brew/dnf) si falta.
 
 ### Verificar instalacion
 ```bash
-php seo-analyzer.php help
+seo help          # Windows (funcion instalada)
+php seo-analyzer.php help   # cualquier sistema
 ```
 
 ## Uso rapido
