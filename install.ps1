@@ -120,7 +120,9 @@ function global:seo {
 }
 "@
 if (-not (Test-Path $profilePath)) { New-Item -ItemType File -Force -Path $profilePath | Out-Null }
-$profileContent = Get-Content $profilePath -Raw -ErrorAction SilentlyContinue
+# Get-Content -Raw devuelve $null en archivo vacio; $null -notmatch evalua a
+# $null (falsy) y el bloque nunca se agregaria. Normalizar a string vacio.
+$profileContent = [string](Get-Content $profilePath -Raw -ErrorAction SilentlyContinue)
 if ($profileContent -notmatch "SEO Analyzer Pro") {
   Add-Content -Path $profilePath -Value $seoBlock
   Write-Ok "Alias 'seo' agregado a tu perfil PowerShell ($profilePath)"
