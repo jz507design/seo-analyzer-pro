@@ -52,8 +52,11 @@ php seo-analyzer.php compare https://tusitio.com https://competidor.com --pdf --
 php seo-analyzer.php crawl https://tusitio.com --max-pages 10
 
 # Reporte PDF/HTML para el cliente
+# Se guardan en data/reports/ (ruta absoluta se muestra al generar).
+# Con --out puedes elegir destino (relativo al directorio actual o absoluto).
 php seo-analyzer.php report https://tusitio.com --pdf
 php seo-analyzer.php report https://tusitio.com --html
+php seo-analyzer.php report https://tusitio.com --pdf --out C:\clientes\auditoria.pdf
 
 # Historial (SQLite local)
 php seo-analyzer.php history --limit 10
